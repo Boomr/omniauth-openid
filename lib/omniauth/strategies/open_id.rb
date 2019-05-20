@@ -10,15 +10,15 @@ module OmniAuth
       include OmniAuth::Strategy
 
       AX = {
-        :email => 'http://axschema.org/contact/email',
-        :name => 'http://axschema.org/namePerson',
-        :nickname => 'http://axschema.org/namePerson/friendly',
-        :first_name => 'http://axschema.org/namePerson/first',
-        :last_name => 'http://axschema.org/namePerson/last',
-        :city => 'http://axschema.org/contact/city/home',
-        :state => 'http://axschema.org/contact/state/home',
-        :website => 'http://axschema.org/contact/web/default',
-        :image => 'http://axschema.org/media/image/aspect11'
+        email: 'http://axschema.org/contact/email',
+        name: 'http://axschema.org/namePerson',
+        nickname: 'http://axschema.org/namePerson/friendly',
+        first_name: 'http://axschema.org/namePerson/first',
+        last_name: 'http://axschema.org/namePerson/last',
+        city: 'http://axschema.org/contact/city/home',
+        state: 'http://axschema.org/contact/state/home',
+        website: 'http://axschema.org/contact/web/default',
+        image: 'http://axschema.org/media/image/aspect11'
       }
 
       option :name, :open_id
@@ -27,21 +27,21 @@ module OmniAuth
       option :store, ::OpenID::Store::Memory.new
       option :identifier, nil
       option :identifier_param, 'openid_url'
+      option :valid_claim_patterns, nil
 
       def dummy_app
         lambda{|env| [401, {"WWW-Authenticate" => Rack::OpenID.build_header(
-          :identifier => identifier,
-          :return_to => callback_url,
-          :required => options.required,
-          :optional => options.optional,
-          :method => 'post'
+          identifier: identifier,
+          return_to: callback_url,
+          required: options.required,
+          optional: options.optional,
+          method: 'post'
         )}, []]}
       end
 
       def identifier
         i = options.identifier || request.params[options.identifier_param.to_s]
-        i = nil if i == ''
-        i
+        i == '' ? nil : i
       end
       
       def request_phase
@@ -49,7 +49,7 @@ module OmniAuth
       end
 
       def start
-        openid = Rack::OpenID.new(dummy_app, options[:store])
+        openid = Rack::OpenID.new(dummy_app, options[:store], rack_openid_options)
         response = openid.call(env)
         case env['rack.openid.response']
         when Rack::OpenID::MissingResponse, Rack::OpenID::TimeoutResponse
@@ -60,7 +60,7 @@ module OmniAuth
       end
 
       def get_identifier
-        f = OmniAuth::Form.new(:title => 'OpenID Authentication')
+        f = OmniAuth::Form.new(title: 'OpenID Authentication')
         f.label_field('OpenID Identifier', options.identifier_param)
         f.input_field('url', options.identifier_param)
         f.to_response
@@ -83,11 +83,16 @@ module OmniAuth
 
       def openid_response
         unless @openid_response
-          openid = Rack::OpenID.new(lambda{|env| [200,{},[]]}, options[:store])
+          openid = Rack::OpenID.new(lambda{|env| [200, {}, []]}, options[:store], rack_openid_options)
           openid.call(env)
           @openid_response = env.delete('rack.openid.response')
         end
         @openid_response
+      end
+
+      def rack_openid_options
+        valid_claim_patterns = options[:valid_claim_patterns]
+        valid_claim_patterns ? { valid_claim_patterns: valid_claim_patterns } : {}
       end
 
       def sreg_user_info
